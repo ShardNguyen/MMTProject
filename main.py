@@ -70,6 +70,13 @@ for x in addressInfo._headers:
 fileWrite = open(domain + "_" + fileToGet, "wb")
 count = 0
 
+#Receiving and Ignore the HTTP Header before get the HTTP Body
+data = s.recv(contentLength)
+headerStop = data.find(b'\r\n\r\n')
+temp = data.split(b'\r\n\r\n', 1)
+count += temp[1].__sizeof__()
+fileWrite.write(temp[1])
+
 while (count <= contentLength):
 	data = s.recv(contentLength) # Get response
 	#<socket variable>.recv(number of bytes of data)
@@ -79,5 +86,4 @@ while (count <= contentLength):
 	#write(<Content>) is used to write the data into the file
 
 fileWrite.close()
-
 s.close()
