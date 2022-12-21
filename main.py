@@ -58,16 +58,18 @@ s.send(request.encode()) #send request
 # Check where content length is
 contentLength = 0
 #additionalLength = len(addressInfo)
-
+headerCount = 0
 for x in addressInfo._headers:
 	if x[0] == "Content-Length":
 		contentLength = int(x[1], base=10)
+	++headerCount
 # This is to get the content length
 
 
 #----- DATA WRITING -----
+fileName = domain + "_" + fileToGet
 #open(<Name of the file>, "w") is used to open the file for writing
-fileWrite = open(domain + "_" + fileToGet, "wb")
+fileWrite = open(fileName, "wb")
 count = 0
 
 while (count <= contentLength):
