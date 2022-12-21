@@ -72,6 +72,12 @@ fileName = domain + "_" + fileToGet
 fileWrite = open(fileName, "wb")
 count = 0
 
+
+data = None
+data = s.recv(4)
+while (data.decode() != "\r\n\r\n"):
+	data = s.recv(4)
+
 while (count <= contentLength):
 	data = s.recv(contentLength) # Get response
 	#<socket variable>.recv(number of bytes of data)
@@ -81,5 +87,4 @@ while (count <= contentLength):
 	#write(<Content>) is used to write the data into the file
 
 fileWrite.close()
-#nam edited
 s.close()
