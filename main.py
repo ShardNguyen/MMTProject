@@ -48,8 +48,10 @@ s.connect((domain, port)) # Connect
 #<socket variable>.connect(("address", port))
 
 get = "GET /" + path + " HTTP/1.1\r\n"
-host = "Host: " + domain + "\r\n\r\n"
-request = get + host
+host = "Host: " + domain + "\r\n"
+connection = "Connection: keep-alive\r\n"
+keepAlive = "Keep-Alive: timeout=5, max=100\r\n\r\n"
+request = get + host + connection + keepAlive
 s.send(request.encode()) #send request
 #Request must be encoded, so we have to use encode() function
 
@@ -57,12 +59,9 @@ s.send(request.encode()) #send request
 #----- GET CONTENT LENGTH -----
 # Check where content length is
 contentLength = 0
-#additionalLength = len(addressInfo)
-headerCount = 0
 for x in addressInfo._headers:
 	if x[0] == "Content-Length":
 		contentLength = int(x[1], base=10)
-	++headerCount
 # This is to get the content length
 
 
@@ -72,11 +71,35 @@ fileName = domain + "_" + fileToGet
 fileWrite = open(fileName, "wb")
 count = 0
 
-
+# Do not write until header is done passing
 data = None
-data = s.recv(4)
-while (data.decode() != "\r\n\r\n"):
-	data = s.recv(4)
+flag = ""
+
+while (flag != "\r\n\r\n"):
+	data = s.recv(1)
+	dataDecode = data.decode()
+
+	if (flag == "\r\n\r"):
+		if (dataDecode == "\n"):
+			flag += dataDecode
+		else:
+			flag = ""
+
+	elif (flag == "\r\n"):
+		if (dataDecode == "\r"):
+			flag += dataDecode
+		else:
+			flag = ""
+
+	elif (flag == "\r"):
+		if (dataDecode == "\n"):
+			flag += dataDecode
+		else:
+			flag = ""
+
+	else:
+		if (dataDecode == "\r"):
+			flag += dataDecode
 
 while (count <= contentLength):
 	data = s.recv(contentLength) # Get response
