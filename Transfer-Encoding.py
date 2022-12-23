@@ -133,10 +133,12 @@ while (bytesToWrite != 0):
 			data = s.recv(buffer)
 			fileWrite.write(data)
 			bytesToWrite -= buffer
+			print(data.__sizeof__())
 
 		data = s.recv(bytesToWrite)
 		fileWrite.write(data)
-			
+		print(data.__sizeof__())
+		
 	flag = ""
 
 fileWrite.close()
