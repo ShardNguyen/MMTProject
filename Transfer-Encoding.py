@@ -59,7 +59,6 @@ request = get + host + connection + keepAlive
 s.send(request.encode()) #send request
 #Request must be encoded, so we have to use encode() function
 
-
 #----- CHECK TRANSFER ENCODING -----
 # Check if this is transfer encoding chunked
 checkTransferChunk = 0
@@ -68,6 +67,7 @@ for x in addressInfo._headers:
 	if x[0] == "Transfer-Encoding":
 		if x[1] == "chunked":
 			checkTransferChunk = 1
+			break
 
 
 #----- DATA WRITING -----
@@ -106,39 +106,39 @@ while (flag != "\r\n\r\n"):
 		if (dataDecode == "\r"):
 			flag += dataDecode
 
-
-# Get bytes to send numbers
 flag = ""
-bytesToWrite = 1
+stop = 0
 
-while (bytesToWrite != 0):
-	#Check flag to receive the amount of bytesToWrite
-	bytesToWriteString = ""
+while (stop == 0):
+	bytesToWriteHex = ""
 
+	#Take the length of chunks in hex
 	while (flag != "\n"):
-		if (flag != "\r"):
-			bytesToWriteString += flag
-			# Check bugs
-			print(bytesToWriteString)
+		data = s.recv(1)
 		flag = data.decode()
-
-	#Print out that much amount of bytes
-	if (bytesToWriteString != ""):
-		bytesToWrite = int(bytesToWriteString, base=16)
-		print(bytesToWrite)
-
-		buffer = 1024
-
-		while (bytesToWrite >= buffer):
-			data = s.recv(buffer)
-			fileWrite.write(data)
-			bytesToWrite -= buffer
-			print(data.__sizeof__())
-
-		data = s.recv(bytesToWrite)
-		fileWrite.write(data)
-		print(data.__sizeof__())
+		if (flag != "\r"):
+			bytesToWriteHex += flag
 		
+
+	print(bytesToWriteHex)
+
+	#Convert string to int
+	if (bytesToWriteHex != ""):
+		bytesToWriteInt = int(bytesToWriteHex, base=16)
+
+	#Check stop flag
+	if bytesToWriteInt == 0:
+		stop = 1
+
+	#Write data
+	for x in range(bytesToWriteInt):
+		data = s.recv(1)
+		fileWrite.write(data)
+
+	#To write /r/n at the end message
+	data = s.recv(2)
+	fileWrite.write(data)
+
 	flag = ""
 
 fileWrite.close()

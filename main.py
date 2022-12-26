@@ -62,6 +62,7 @@ contentLength = 0
 for x in addressInfo._headers:
 	if x[0] == "Content-Length":
 		contentLength = int(x[1], base=10)
+		break
 # This is to get the content length
 
 
