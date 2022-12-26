@@ -72,7 +72,6 @@ fileName = domain + "_" + fileToGet
 fileWrite = open(fileName, "wb")
 count = 0
 
-<<<<<<< HEAD
 # Do not write until header is done passing
 data = None
 flag = ""
@@ -102,14 +101,6 @@ while (flag != "\r\n\r\n"):
 	else:
 		if (dataDecode == "\r"):
 			flag += dataDecode
-=======
-#Receiving and Ignore the HTTP Header before get the HTTP Body
-data = s.recv(contentLength)
-headerStop = data.find(b'\r\n\r\n')
-temp = data.split(b'\r\n\r\n', 1)
-count += temp[1].__sizeof__()
-fileWrite.write(temp[1])
->>>>>>> 3cab849b40cf8f1140eccc1745a46d3fef8dcc35
 
 while (count <= contentLength):
 	data = s.recv(contentLength) # Get response
