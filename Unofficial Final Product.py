@@ -97,14 +97,11 @@ while (flag != "\r\n\r\n"):
 
 #----- FUNCTIONS FOR TWO TYPES OF WEBSITE -----
 def contentLength(s, fileWrite, length):
-	count = 0
-	while (count <= length):
-		data = s.recv(length) # Get response
+	for x in range(length):
+		data = s.recv(1) # Get response
 		#<socket variable>.recv(number of bytes of data)
 		#data is used to store information that is requested above
 		fileWrite.write(data)
-		count += data.__sizeof__()
-		#write(<Content>) is used to write the data into the file
 
 def transferEncoding(s, fileWrite):
 	flag = ""
