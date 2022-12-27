@@ -2,7 +2,8 @@ import socket
 import urllib.request
 import os
 
-def downloadFile(address: str, fileName: str):
+#current Target: DOWNLOAD FOLDER
+def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save || File name
 
 	# ----- CREATING SOCKET -----
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -12,60 +13,74 @@ def downloadFile(address: str, fileName: str):
 	#socket.SOCK_STREAM is TCP
 
 	domain = address.split('/',1)[0]
-	path = address.replace(domain,"")
+	downloadPath = address.replace(domain,"")
+
+
 	#----- CONNECT -----
 	s.connect((domain, DEFAULT_PORT)) # Connect
 	#<socket variable>.connect(("address", port))
 
-	get = "GET /" + path + " HTTP/1.1\r\n"
+	get = "GET /" + downloadPath + " HTTP/1.1\r\n"
 	host = "Host: " + domain + "\r\n\r\n"
 	request = get + host
 	s.send(request.encode()) #send request
 	#Request must be encoded, so we have to use encode() function
 
 
-	#----- DATA WRITING -----
-	#open(<Name of the file>, "w") is used to open the file for writing
-	fileWrite = open(domain + "_" + fileName, "wb")
-	count = 0
+	#----- GET CONTENT LENGTH -----
+	contentLength = 1024
 
-	addressInfo = urllib.request.urlopen('https://' + address).info()
-		#----- GET CONTENT LENGTH -----
-	# Check where content length is
-	contentLength = 0
-	for x in addressInfo._headers:
-		if x[0] == "Content-Length":
-			contentLength = int(x[1], base=10)
-			break
-	
-	#Receiving and Ignore the HTTP Header before get the HTTP Body
-	data = s.recv(contentLength)
-	headerStop = data.find(b'\r\n\r\n')
-	temp = data.split(b'\r\n\r\n', 1)
-	count += temp[1].__sizeof__()
-	fileWrite.write(temp[1])
 
-	while (count <= contentLength):
-		data = s.recv(contentLength) # Get response
-		#<socket variable>.recv(number of bytes of data)
-		#data is used to store information that is requested above
-		fileWrite.write(data)
-		count += data.__sizeof__()
-		#write(<Content>) is used to write the data into the file
 
-	fileWrite.close()
+	#----- GET HEADER ------
+	header = s.recv(contentLength)
+	headerStop = header.find(b'\r\n\r\n')
+	while (headerStop == -1):
+		header += s.recv(contentLength)
+
+
+	with open(savePath + ('/' if savePath else '') + fileName, "wb") as fileWrite:
+
+			#Write redundant bytes in last header recv to the file, which are not header but Content
+		notHeader = header.rsplit(b'\r\n\r\n')[0]
+		fileWrite.write(notHeader)
+		count = notHeader.__sizeof__()
+
+		#Get Content-Length from header
+		contentLengthIndex = header.find(b'Content-Length:')
+		contentLength = int(header[contentLengthIndex + 16: header.find(b'\r\n', contentLengthIndex + 16)].decode())
+				
+		while (count <= contentLength):
+			data = s.recv(contentLength) # Get response
+			#<socket variable>.recv(number of bytes of data)
+			#data is used to store information that is requested above
+			fileWrite.write(data)
+			count += data.__sizeof__() 	#increase the count by number of read bytes
+
+	#----- Close Socket -----
 	s.close()
 
-def downloadFolder(url: str):
-	partsList = url.split('/')
+
+
+
+def downloadFolder():
+	partsList = address.split('/')
 	domain = partsList[0]
 
-	#Create folder: domain_folderName
-	downloadFolderName = domain + '_' + partsList[len(partsList) - 1]
-	os.mkdir(downloadFolderName)
 
-	#download index.html
-	downloadFile(url, 'index.html')
+	#----- Create folder: domain_folderName ------
+	downloadFolderName = domain + '_' + partsList[-1]
+	if not os.path.exists(downloadFolderName):
+		os.mkdir(downloadFolderName)
+
+
+	#----- DOWNLOAD index.html -----
+	downloadFile(address, 'index.html', downloadFolderName)
+
+	#----- Parsing the index.html -----
+	fin = open('index.html', 'r')	
+
+
 
 
 if __name__ == "__main__":
@@ -84,6 +99,8 @@ if __name__ == "__main__":
 		address = address.replace("http://", "", 1)
 		#Replace 1 appearance of 'http://' with '' (Basically deleting it)
 
+
+	#if the last part contain '.' -> means it's a file, then downloadFile
 	partsList = address.split('/')
 
 	if (partsList[len(partsList) - 1].find('.') == -1):
