@@ -1,6 +1,7 @@
 import socket
 import urllib.request
 
+
 # ----- CREATING SOCKET -----
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #socket.socket(addr_family, type)
@@ -87,3 +88,4 @@ while (count <= contentLength):
 
 fileWrite.close()
 s.close()
+
