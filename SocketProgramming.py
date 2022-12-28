@@ -4,13 +4,12 @@ import socket
 #----- Parsing ------ 
 from urllib.parse import urlparse
 from urllib.parse import unquote
-from html.parser import HTMLParser
 
 #----- mkdir -----
 import os
 
-#current Target: DOWNLOAD FOLDER
-def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save || File name
+
+def downloadFileCLength(downloadPath: str, fileName: str, savePath = ""):	#savePath has default empty value (for current directory download)
 
 	# ----- CREATING SOCKET -----
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -19,34 +18,43 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save
 	#socket.AF_INET is IPv4
 	#socket.SOCK_STREAM is TCP
 
-	domain = url.hostname
+	HOST = url.hostname
 
 	#----- CONNECT -----
-	s.connect((domain, DEFAULT_PORT)) # Connect
+	s.connect((HOST, DEFAULT_PORT)) # Connect
 	#<socket variable>.connect(("address", port))
 
 	get = "GET " + downloadPath + " HTTP/1.1\r\n"
 	keepAlive = 'Connection: keep-alive\r\n'
-	host = "Host: " + domain + '\r\n'
+	host = "Host: " + HOST + '\r\n'
 	request = get + host + keepAlive + "\r\n"
 
-	s.send(request.encode()) #send request
-	#Request must be encoded, so we have to use encode() function
-
-
+	#----- SEND REQUEST -----
+	sent = s.send(request.encode()) #Request must be encoded, so we have to use encode() function
+	if sent == 0:
+		raise RuntimeError("socket connection broken")
+	
 	#----- default CONTENT-LENGTH -----
-	contentLength = 8192*2
+	contentLength = 4096
 
 
 	#----- GET HEADER ------
 	header = s.recv(contentLength)
 	while (header.find(b'\r\n\r\n') == -1):
-		header += s.recv(contentLength)
+		temp = s.recv(contentLength)
+
+		#Raise error if recv NOTHING
+		if temp.__sizeof__ == 0:
+			raise RuntimeError("socket connection broken")
+		header += temp
 
 
 	#----- 404 HANDLING ------
-	if header.find(b'404') != -1:
-		print('Error 404 not found ', fileName )
+	if header.find(b'404 Not Found') != -1:
+		print('Error 404 Not Found ', fileName )
+		return
+	if header.find(b'301 Moved Permanently') != -1:
+		print('Error 301 Moved Permanently')
 		return
 
 
@@ -67,6 +75,10 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save
 		
 		while (count <= contentLength):
 			data = s.recv(contentLength) # Get response
+			
+			#Raise error if recv NOTHING
+			if data.__sizeof__ == 0:
+				raise RuntimeError("socket connection broken")
 			#<socket variable>.recv(number of bytes of data)
 			#data is used to store information that is requested above
 			fileWrite.write(data)
