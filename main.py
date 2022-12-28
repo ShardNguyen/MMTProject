@@ -13,22 +13,24 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save
 	#socket.SOCK_STREAM is TCP
 
 	domain = address.split('/',1)[0]
-	downloadPath = address.replace(domain,"")
+	downloadPath = address.replace(domain,"").replace(fileName, '')
 
 
 	#----- CONNECT -----
 	s.connect((domain, DEFAULT_PORT)) # Connect
 	#<socket variable>.connect(("address", port))
 
-	get = "GET /" + downloadPath + " HTTP/1.1\r\n"
-	host = "Host: " + domain + "\r\n\r\n"
-	request = get + host
+	get = "GET " + downloadPath + fileName + " HTTP/1.1\r\n"
+	keepAlive = 'Connection: keep-alive\r\n'
+	host = "Host: " + domain + '\r\n'
+	request = get + host + keepAlive + "\r\n"
+
 	s.send(request.encode()) #send request
 	#Request must be encoded, so we have to use encode() function
 
 
 	#----- GET CONTENT LENGTH -----
-	contentLength = 1024
+	contentLength = 100000
 
 
 
@@ -37,19 +39,24 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save
 	headerStop = header.find(b'\r\n\r\n')
 	while (headerStop == -1):
 		header += s.recv(contentLength)
+		headerStop = header.find(b'\r\n\r\n')
 
+	if header.find(b'404') != -1:
+		print('Error 404 not found ', fileName )
+		return
 
-	with open(savePath + ('/' if savePath else '') + fileName, "wb") as fileWrite:
+	with open(savePath + ('/' if savePath else '') + (fileName if fileName else 'index.html'), "wb") as fileWrite:
 
 			#Write redundant bytes in last header recv to the file, which are not header but Content
-		notHeader = header.rsplit(b'\r\n\r\n')[0]
+		notHeader = header.split(b'\r\n\r\n', 1)[1]
 		fileWrite.write(notHeader)
 		count = notHeader.__sizeof__()
 
 		#Get Content-Length from header
 		contentLengthIndex = header.find(b'Content-Length:')
-		contentLength = int(header[contentLengthIndex + 16: header.find(b'\r\n', contentLengthIndex + 16)].decode())
-				
+		n = header[contentLengthIndex + 16: header.find(b'\r\n', contentLengthIndex + 16)].decode()
+		contentLength = int(n)
+		
 		while (count <= contentLength):
 			data = s.recv(contentLength) # Get response
 			#<socket variable>.recv(number of bytes of data)
@@ -64,7 +71,8 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):	#path to save
 
 
 def downloadFolder():
-	partsList = address.split('/')
+	addresss = address.removesuffix('/')
+	partsList = addresss.split('/')
 	domain = partsList[0]
 
 
@@ -75,23 +83,43 @@ def downloadFolder():
 
 
 	#----- DOWNLOAD index.html -----
-	downloadFile(address, 'index.html', downloadFolderName)
+	downloadFile(address, '', downloadFolderName)
 
-	#----- Parsing the index.html -----
-	fin = open('index.html', 'r')	
+	#----- Parsing the index.html and looping downloadFile-----
+	with open(downloadFolderName + '/index.html', 'r') as fin:
+		indexHTML = fin.read()
+
+	URLindex = 0
+	while (1):
+		URLindex = indexHTML.find('href="',URLindex, indexHTML.__sizeof__()-1)
+		if (URLindex == -1):
+			print('Complete Download the folder ', downloadFolderName)
+			break
+		#Move the index to file start pos (6 is size of 'href="')
+		URLindex += 6
+
+		#Extract fileName from index.html
+		fileName = indexHTML[URLindex : indexHTML.find('"',URLindex)]
+
+		#if the fileName is not a file name:
+		if (fileName.find('.') == -1):
+			continue
+			
+		#Call download the file with
+		downloadFile(address.replace(domain,''), fileName, downloadFolderName)
 
 
 
 
 if __name__ == "__main__":
-
+	fileCount = 0
 
 	#----- GETTING THINGS READY -----
 	address = input("Enter address: ")
 	DEFAULT_PORT = 80
 	
 	if address[0:8:1] == "https://":
-		address = address.replace("http://", "", 1)
+		address = address.replace("https://", "", 1)
 		#Replace 1 appearance of 'http://' with '' (Basically deleting it)
 
 	#This is to remove http://
@@ -104,33 +132,6 @@ if __name__ == "__main__":
 	partsList = address.split('/')
 
 	if (partsList[len(partsList) - 1].find('.') == -1):
-		downloadFolder(address)
+		downloadFolder()
 	else:
 		downloadFile(address, partsList[len(partsList) - 1])
-
-
-def temp():
-	#This is to remove http://
-	if address[0:7:1] == "http://":
-		address = address.replace("http://", "", 1)
-		#Replace 1 appearance of 'http://' with '' (Basically deleting it)
-
-	#Split the address into parts
-	partsList = address.split('/')
-
-	#The first element of the parts list is the domain name
-	domain = partsList[0]
-
-	#Get the requested file name
-	fileToGet = "index.html"
-
-	if len(partsList) != 1 and partsList[1] != "":
-		fileToGet = partsList[len(partsList) - 1]
-		#The last element of the parts list is the file name
-
-	#Get path to the file
-	path = address.replace(domain, "")		#http://gaia.cs.umass.edu/wireshark-labs/alice.txt
-											#            domain		 ||        path
-
-	if path == "" or path == "/": #if path is empty then use default file
-		path += fileToGet
