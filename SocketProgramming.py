@@ -13,7 +13,7 @@ import sys
 
 #----- CONSTANTS & GLOBAL Vars -----
 DEFAULT_PORT = 80
-BUF_SIZE = 4196
+BUF_SIZE = 4196*4
 
 recvBUF = bytearray()
 recvCount = 0
@@ -33,16 +33,17 @@ def downloadFileCLength(downloadPath: str, fileName: str, savePath: str, content
 		# fileWrite.write(recvBUF)
 		# recvCount = recvBUF.__sizeof__()
 		recvCount = 0
-		while (recvCount <= contentLength):
+		while (recvCount < contentLength):
 			data = s.recv(contentLength) # Get response
 			
 			#Raise error if recv NOTHING
-			if data.__sizeof__ == 0:
+			if len(data) == 0:
 				raise RuntimeError("socket connection broken")
+				
 			#<socket variable>.recv(number of bytes of data)
 			#data is used to store information that is requested above
 			fileWrite.write(data)
-			recvCount += data.__sizeof__() 	#increase the count by number of read bytes
+			recvCount += len(data) 	#increase the count by number of read bytes
 
 
 
@@ -156,7 +157,7 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):
 		else: #normal data: header
 			header += data
 
-	#----- 404 HANDLING ------
+	#----- ERR HANDLING ------
 	if header.find(b'404 Not Found') != -1:
 		print('Error 404 Not Found ', fileName )
 		return
@@ -165,10 +166,6 @@ def downloadFile(downloadPath: str, fileName: str, savePath = ""):
 		return
 	
 	# if no err happens, then continue downloading
-	#put back data behind '\r\n\r\n' in header to recvbuf
-	# global recvBUF
-	# recvBUF = header.split(b'\r\n\r\n',1)[1]
-
 
 	#----- DECIDE DOWNLOAD MODE -----
 	# if header has 'chunked' then call chunked
