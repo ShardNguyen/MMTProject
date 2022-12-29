@@ -9,7 +9,19 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "args": ["http://www.httpwatch.com/httpgallery/chunked/chunkedimage.aspx", "http://web.stanford.edu/class/cs231a/project.html"],
+            "args": [
+                     "http://example.com/index.html",
+                     "http://web.stanford.edu/class/cs224w/slides/08-GNN-application.pdf",
+                     "http://web.stanford.edu/class/cs231a/assignments.html",
+                     "http://gaia.cs.umass.edu/wireshark-labs/alice.txt",
+                     "http://anglesharp.azurewebsites.net/Chunked",
+                     "http://www.httpwatch.com/httpgallery/chunked/chunkedimage.aspx",
+                     "http://www.google.com/index.html",
+                     "http://www.bing.com",
+                     "http://web.stanford.edu/class/cs142/lectures/",
+                     "http://web.stanford.edu/class/cs143/handouts/",
+                     "http://web.stanford.edu/class/cs231a/course_notes/",
+                     "http://web.stanford.edu/class/cs224w/slides/"],
             "console": "integratedTerminal",
             "justMyCode": true
         }

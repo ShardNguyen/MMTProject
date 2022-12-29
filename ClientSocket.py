@@ -16,14 +16,15 @@ BUF_SIZE = 4196*4
 class ClientSocket:
 	def __init__(self) -> None:
 		self.s = socket.socket()
+		self.HOST = ''
 
 	def __del__(self):
 		self.s.close()
 
-	def downloadFileCLength(self, fileName: str, savePath: str, contentLength = BUF_SIZE):	#savePath has default empty value (for current directory download)
+	def downloadFileCLength(self, fileName: str, savePath: str = '', contentLength = BUF_SIZE):	#savePath has default empty value (for current directory download)
 		#----- WRITE TO FILE ------
 		fileName = unquote(fileName) #to decode URL special characters (i.e. %20 means whitespace: ' ')
-		print('Downloading ',fileName)
+		print('Downloading',fileName)
 		with open(savePath + ('/' if savePath else '') + fileName, "wb") as fileWrite:
 
 			# #Write redundant bytes in last header recv to the file, which are not header but Content
@@ -58,37 +59,30 @@ class ClientSocket:
 					flag = data
 					if (flag != b"\r"):
 						bytesToWriteHex += flag
-					
+
 
 				#Convert string to int
 				if (bytesToWriteHex != b""):
-					print(int(bytesToWriteHex.decode(),16))
 					bytesToWriteInt = int(bytesToWriteHex.decode(), base=16)
 
-				#Check stop flag
-				if bytesToWriteInt == 0:
-					break
+				if bytesToWriteInt == 0: break
 
 				#Write data
 				recvCount = 0
 				while(recvCount < bytesToWriteInt):
-					data = self.s.recv(bytesToWriteInt)
-					fileWrite.write(data)
-					recvCount += len(data)
-
+					fileWrite.write(self.s.recv(1))
+					recvCount += 1
 				#To bypass /r/n at the end message
 				data = self.s.recv(2)
 
 				flag = ""
 
-	def downloadFile(self, url, fileName: str, savePath = ""):
-		downloadPath = url.path
-		HOST = url.hostname
+	def downloadFile(self, downloadPath: str(), fileName: str, savePath = ""):
 
 		get = "GET " + downloadPath + " HTTP/1.1\r\n"
 		connection = 'Connection: keep-alive\r\n'
 		keepAlive = "Keep-Alive: timeout=5, max=1000\r\n"
-		host = "Host: " + HOST + '\r\n'
+		host = "Host: " + self.HOST + '\r\n'
 		request = get + host + connection + keepAlive + "\r\n"
 
 		#----- SEND REQUEST -----
@@ -159,7 +153,7 @@ class ClientSocket:
 		
 
 
-	def downloadFolder(url):
+	def downloadFolder(self, url):
 		partsList = url.path.rstrip('/').split('/')
 		domain = url.hostname
 
@@ -170,7 +164,7 @@ class ClientSocket:
 
 
 		#----- DOWNLOAD index.html -----
-		self.downloadFile(url, 'index.html', downloadFolderName)
+		self.downloadFile(url.path, 'index.html', downloadFolderName)
 
 		#----- Parsing the index.html and looping downloadFile-----
 		with open(downloadFolderName + '/index.html', 'r') as fin:
@@ -180,7 +174,7 @@ class ClientSocket:
 		while (1):
 			URLindex = indexHTML.find('href="', URLindex)
 			if (URLindex == -1):
-				print('Complete Download the folder ', downloadFolderName)
+				print('Complete Download the folder',downloadFolderName)
 				break
 			#Move the index to file start pos (6 is size of 'href="')
 			URLindex += 6
@@ -193,7 +187,7 @@ class ClientSocket:
 				continue
 
 			#----- DOWNLOAD a FILE from FOLDER -----
-			self.downloadFile(url + fileName, fileName, downloadFolderName)
+			self.downloadFile(url.path + '/' + fileName, fileName, downloadFolderName)
 
 
 
@@ -205,6 +199,7 @@ def handleConnection(address: str()):
 
 	#----- Creating ClientSocket object
 	cs = ClientSocket()
+	cs.HOST = url.hostname
 
 	# ----- CREATING SOCKET -----
 	cs.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -212,10 +207,9 @@ def handleConnection(address: str()):
 	#This is used to create a socket
 	#socket.AF_INET is IPv4
 	#socket.SOCK_STREAM is TCP
-	HOST = url.hostname
 
 	#----- CONNECT -----
-	cs.s.connect((HOST, DEFAULT_PORT)) # Connect
+	cs.s.connect((cs.HOST, DEFAULT_PORT)) # Connect
 	#<socket variable>.connect(("address", port))
 
 	
@@ -224,7 +218,7 @@ def handleConnection(address: str()):
 		if (url.path.find('.') == -1):
 			cs.downloadFolder(url)
 		else:
-			cs.downloadFile(url, url.hostname + '_' + url.path.rstrip('/').split('/')[-1])
+			cs.downloadFile(url.path, url.hostname + '_' + url.path.rstrip('/').split('/')[-1])
 
 	else:	#Với các request là "/" gốc thì mặc định tải và lưu thành file '<domain>_index.html'
-		cs.downloadFile(url, url.hostname + '_index.html')
+		cs.downloadFile('/', url.hostname + '_index.html')
