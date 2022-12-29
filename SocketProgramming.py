@@ -17,7 +17,7 @@ BUF_SIZE = 4196*4
 
 recvBUF = bytearray()
 recvCount = 0
-s = None
+s = socket.socket()
 
 
 
@@ -39,7 +39,7 @@ def downloadFileCLength(downloadPath: str, fileName: str, savePath: str, content
 			#Raise error if recv NOTHING
 			if len(data) == 0:
 				raise RuntimeError("socket connection broken")
-				
+
 			#<socket variable>.recv(number of bytes of data)
 			#data is used to store information that is requested above
 			fileWrite.write(data)

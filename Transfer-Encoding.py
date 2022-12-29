@@ -134,9 +134,8 @@ while (1):
 		data = s.recv(1)
 		fileWrite.write(data)
 
-	#To write /r/n at the end message
+	#To bypass /r/n at the end line
 	data = s.recv(2)
-	fileWrite.write(data)
 
 	flag = ""
 
