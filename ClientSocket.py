@@ -36,7 +36,7 @@ class ClientSocket:
 				#socket.AF_INET is IPv4
 				#socket.SOCK_STREAM is TCP
 
-			self.s.settimeout(600) #set time out giữa 2 lần recv() là 10 phút
+			self.s.settimeout(30) #set time out cho 1 lần recv() là 30 giây
 			self.s.connect((self.HOST, DEFAULT_PORT))
 
 			#<socket variable>.connect(("address", port))
@@ -49,7 +49,7 @@ class ClientSocket:
 	#----- Close Connection -----
 	def closeConnection(self):
 		# SHUTDOWN: đóng connection, nhưng để lại buffer để đọc nốt mấy cái còn dư
-		# CLOSE: Huỷ xoá buffer, huỷ object Socket()
+		# CLOSE: Huỷ xoá bộ nhớ mà socket đang nắm giữ
 		self.s.shutdown(socket.SHUT_RDWR)
 		self.s.close()
 
@@ -83,11 +83,8 @@ class ClientSocket:
 		#----- WRITE TO FILE ------
 		fileName = unquote(fileName) #to decode URL special characters (i.e. %20 means whitespace: ' ')
 		print('Downloading',fileName)
-		with open(savePath + ('/' if savePath else '') + fileName, "wb") as fileWrite:
 
-			# #Write redundant bytes in last header recv to the file, which are not header but Content
-			# fileWrite.write(recvBUF)
-			# recvCount = len(recvBUF)
+		with open(savePath + ('/' if savePath else '') + fileName, "wb") as fileWrite:
 			recvCount = 0
 			while (recvCount < contentLength):
 				data = self.s.recv(contentLength) # Get response
@@ -98,11 +95,10 @@ class ClientSocket:
 					self.closeConnection()
 					return False
 
-
-				#<socket variable>.recv(number of bytes of data)
-				#data is used to store information that is requested above
+				# <socket variable>.recv(number of bytes of data)
+				# data is used to store information that is requested above
 				fileWrite.write(data)
-				recvCount += len(data) 	#increase the count by number of read bytes
+				recvCount += len(data) 	#i ncrease the count by number of read bytes
 			
 			#--- Download Complete ---
 			return True
@@ -136,7 +132,9 @@ class ClientSocket:
 				if (bytesToWriteHex != b""):
 					bytesToWriteInt = int(bytesToWriteHex.decode(), base=16)
 
-				if bytesToWriteInt == 0: break
+				# 0 nghĩa là kết thúc file, đã tải xong
+				if bytesToWriteInt == 0:
+					return True
 
 				#Write data
 				recvCount = 0
@@ -157,15 +155,12 @@ class ClientSocket:
 
 				flag = ''
 
-		#--- Download Complete ---
-		return True
-
 
 	def downloadFile(self, downloadPath: str(), fileName: str, savePath = "", attemps = 0) -> True:
 		
 		#----- if >= 3 attemps, proceed to break
 		if (attemps == 3):
-			print("Cannot download file")
+			print("Cannot download file", fileName)
 			return False
 
 		#Send Request
@@ -218,6 +213,7 @@ class ClientSocket:
 
 		#----- ERR HANDLING ------
 		if header.find(b'200 OK') == -1:
+			print("Error while requesting file", fileName)
 			print(header.decode())
 			return False
 
@@ -242,7 +238,7 @@ class ClientSocket:
 
 		#----- Create folder: domain_folderName ------
 		downloadFolderName = domain + '_' + partsList[-1]
-		if not os.path.exists(downloadFolderName):
+		if not os.path.exists(downloadFolderName): # Nếu folder tồn tại thì không tạo nữa
 			os.mkdir(downloadFolderName)
 
 
@@ -289,12 +285,14 @@ def handleConnection(address: str()):
 	#----- CONNECT -----
 	cs.startConnection()
 
-	
-	if len(url.path) > 1:
-		#if the path contain '.' -> means it's a file, then downloadFile
+	#----- URL là 1 file, 1 folder hay là thư mục gốc '/'? ------
+	if len(url.path) > 1: #URL khác '' và '/'
+
+		#URL chứa dấu '.' tức đây là URL tải 1 file
 		if (url.path.find('.') == -1):
 			return cs.downloadFolder(url)
-		else:
+
+		else:	# Tải 1 Folder
 			return cs.downloadFile(url.path, url.hostname + '_' + url.path.rstrip('/').split('/')[-1])
 
 	else:	#Với các request là "/" gốc thì mặc định tải và lưu thành file '<domain>_index.html'
