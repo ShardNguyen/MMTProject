@@ -36,7 +36,7 @@ class ClientSocket:
 				#socket.AF_INET is IPv4
 				#socket.SOCK_STREAM is TCP
 
-			self.s.settimeout(30) #set time out giữa 2 lần recv() là 30 giây
+			self.s.settimeout(600) #set time out giữa 2 lần recv() là 10 phút
 			self.s.connect((self.HOST, DEFAULT_PORT))
 
 			#<socket variable>.connect(("address", port))
