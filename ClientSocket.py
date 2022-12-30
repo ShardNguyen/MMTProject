@@ -12,16 +12,74 @@ import os
 DEFAULT_PORT = 80
 BUF_SIZE = 4196*4
 
-
+#---- Đưa hết các method liên quan vào 1 class
+# Chia sẻ vài attribute chung: socket, HOST
 class ClientSocket:
+	#----- Constructor -----
 	def __init__(self) -> None:
+		# ----- CREATING SOCKET -----
 		self.s = socket.socket()
-		self.HOST = ''
 
+		self.HOST = ''	#Chứa tên miền - domain
+
+
+	#----- Destructor -----
 	def __del__(self):
 		self.s.close()
 
-	def downloadFileCLength(self, fileName: str, savePath: str = '', contentLength = BUF_SIZE):	#savePath has default empty value (for current directory download)
+
+	def startConnection(self):
+		try:
+			self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				#socket.socket(addr_family, type)
+				#This is used to create a socket
+				#socket.AF_INET is IPv4
+				#socket.SOCK_STREAM is TCP
+
+			self.s.settimeout(30) #set time out giữa 2 lần recv() là 30 giây
+			self.s.connect((self.HOST, DEFAULT_PORT))
+
+			#<socket variable>.connect(("address", port))
+		except:
+			print("Socket Timeout Err")
+			return False
+		return True
+
+
+	#----- Close Connection -----
+	def closeConnection(self):
+		# SHUTDOWN: đóng connection, nhưng để lại buffer để đọc nốt mấy cái còn dư
+		# CLOSE: Huỷ xoá buffer, huỷ object Socket()
+		self.s.shutdown(socket.SHUT_RDWR)
+		self.s.close()
+
+
+	def sendRequest(self, downloadPath: str(), attemps: int() = 0) -> bool:
+		#If 3 attemmps are made but failed, drop file.
+		if (attemps == 3):
+			print("Cannot send request, skipping...")
+			return False
+		
+		#Generate Request
+		get = "GET " + downloadPath + " HTTP/1.1\r\n"
+		connection = 'Connection: keep-alive\r\n'
+		keepAlive = "Keep-Alive: timeout=5, max=1000\r\n"
+		host = "Host: " + self.HOST + '\r\n'
+		request = get + host + connection + keepAlive + "\r\n"
+
+
+		#----- SEND REQUEST -----
+		sent = self.s.send(request.encode()) #Request must be encoded, so we have to use encode() function
+		if sent == 0:
+			print("Cannot send request, trying to reconnect")
+			self.closeConnection()
+			self.startConnection()
+			self.sendRequest(downloadPath, attemps + 1)
+		
+		return True
+
+
+	def downloadFileCLength(self, fileName: str, savePath: str = '', contentLength = BUF_SIZE) -> bool:	#savePath has default empty value (for current directory download)
 		#----- WRITE TO FILE ------
 		fileName = unquote(fileName) #to decode URL special characters (i.e. %20 means whitespace: ' ')
 		print('Downloading',fileName)
@@ -36,16 +94,22 @@ class ClientSocket:
 				
 				#Raise error if recv NOTHING
 				if len(data) == 0:
-					raise RuntimeError("socket connection broken")
+					print("socket connection broken")
+					self.closeConnection()
+					return False
+
 
 				#<socket variable>.recv(number of bytes of data)
 				#data is used to store information that is requested above
 				fileWrite.write(data)
 				recvCount += len(data) 	#increase the count by number of read bytes
+			
+			#--- Download Complete ---
+			return True
 
 
 
-	def downloadFileChunked(self, fileName: str, savePath: str):
+	def downloadFileChunked(self, fileName: str, savePath: str)-> bool:
 		with open(savePath + ('/' if savePath else '') + (fileName if fileName else 'index.html'), "wb") as fileWrite:
 			data = None
 			flag = b''
@@ -56,6 +120,13 @@ class ClientSocket:
 				#Take the length of chunks in hex
 				while (flag != b"\n"):
 					data = self.s.recv(1)
+
+					#Raise error if recv NOTHING
+					if len(data) == 0:
+						print("socket connection broken")
+						self.closeConnection()
+						return False
+
 					flag = data
 					if (flag != b"\r"):
 						bytesToWriteHex += flag
@@ -70,33 +141,49 @@ class ClientSocket:
 				#Write data
 				recvCount = 0
 				while(recvCount < bytesToWriteInt):
-					fileWrite.write(self.s.recv(1))
+					data = self.s.recv(1)
+
+					#Raise error if recv NOTHING
+					if len(data) == 0:
+						print("socket connection broken")
+						self.closeConnection()
+						return False
+	
+					fileWrite.write(data)
 					recvCount += 1
+
 				#To bypass /r/n at the end message
 				data = self.s.recv(2)
 
-				flag = ""
+				flag = ''
 
-	def downloadFile(self, downloadPath: str(), fileName: str, savePath = ""):
+		#--- Download Complete ---
+		return True
 
-		get = "GET " + downloadPath + " HTTP/1.1\r\n"
-		connection = 'Connection: keep-alive\r\n'
-		keepAlive = "Keep-Alive: timeout=5, max=1000\r\n"
-		host = "Host: " + self.HOST + '\r\n'
-		request = get + host + connection + keepAlive + "\r\n"
 
-		#----- SEND REQUEST -----
-		sent = self.s.send(request.encode()) #Request must be encoded, so we have to use encode() function
-		if sent == 0:
-			raise RuntimeError("socket connection broken")
+	def downloadFile(self, downloadPath: str(), fileName: str, savePath = "", attemps = 0) -> True:
+		
+		#----- if >= 3 attemps, proceed to break
+		if (attemps == 3):
+			print("Cannot download file")
+			return False
+
+		#Send Request
+		self.sendRequest(downloadPath)
 		
 		#----- GET HEADER ------
-
 		header = b''
 		flag = b''
 		while (flag != b"\r\n\r\n"):
 			data = self.s.recv(1)
 
+			#----- Error handling -----
+			if len(data) == 0:
+				print("recv 0 err")
+				self.closeConnection()
+				self.startConnection()
+				return self.downloadFile(downloadPath, fileName, savePath, attemps + 1)
+			
 			if (flag == b"\r\n\r"):
 				if (data == b"\n"):
 					flag += data
@@ -130,25 +217,21 @@ class ClientSocket:
 				header += data
 
 		#----- ERR HANDLING ------
-		if header.find(b'404 Not Found') != -1:
-			print('Error 404 Not Found ', fileName )
-			return
-		if header.find(b'301 Moved Permanently') != -1:
-			print('Error 301 Moved Permanently')
-			return
-		
-		# if no err happens, then continue downloading
+		if header.find(b'200 OK') == -1:
+			print(header.decode())
+			return False
 
+		# if no err happens, then continue downloading
 		#----- DECIDE DOWNLOAD MODE -----
 		# if header has 'chunked' then call chunked
 		if (header.find(b'chunked') != -1):
-			self.downloadFileChunked(fileName, savePath)
+			return self.downloadFileChunked(fileName, savePath)
 		else:
 			#Get Content-Length from header
 			contentLengthIndex = header.find(b'Content-Length:')
 			n = header[contentLengthIndex + 16: header.find(b'\r\n', contentLengthIndex + 16)].decode()
 			contentLength = int(n)
-			self.downloadFileCLength(fileName, savePath, contentLength)
+			return self.downloadFileCLength(fileName, savePath, contentLength)
 
 		
 
@@ -164,7 +247,9 @@ class ClientSocket:
 
 
 		#----- DOWNLOAD index.html -----
-		self.downloadFile(url.path, 'index.html', downloadFolderName)
+		if (not self.downloadFile(url.path, 'index.html', downloadFolderName)):
+			print("Cannot download index.html of a folder, exitting!")
+			return False
 
 		#----- Parsing the index.html and looping downloadFile-----
 		with open(downloadFolderName + '/index.html', 'r') as fin:
@@ -189,11 +274,11 @@ class ClientSocket:
 			#----- DOWNLOAD a FILE from FOLDER -----
 			self.downloadFile(url.path + '/' + fileName, fileName, downloadFolderName)
 
+		#----- Download complete-----
+		return True
 
 
 
-
-	#----- SOCKET CONNECT -----
 def handleConnection(address: str()):
 	url = urlparse(address)
 
@@ -201,24 +286,16 @@ def handleConnection(address: str()):
 	cs = ClientSocket()
 	cs.HOST = url.hostname
 
-	# ----- CREATING SOCKET -----
-	cs.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	#socket.socket(addr_family, type)
-	#This is used to create a socket
-	#socket.AF_INET is IPv4
-	#socket.SOCK_STREAM is TCP
-
 	#----- CONNECT -----
-	cs.s.connect((cs.HOST, DEFAULT_PORT)) # Connect
-	#<socket variable>.connect(("address", port))
+	cs.startConnection()
 
 	
 	if len(url.path) > 1:
 		#if the path contain '.' -> means it's a file, then downloadFile
 		if (url.path.find('.') == -1):
-			cs.downloadFolder(url)
+			return cs.downloadFolder(url)
 		else:
-			cs.downloadFile(url.path, url.hostname + '_' + url.path.rstrip('/').split('/')[-1])
+			return cs.downloadFile(url.path, url.hostname + '_' + url.path.rstrip('/').split('/')[-1])
 
 	else:	#Với các request là "/" gốc thì mặc định tải và lưu thành file '<domain>_index.html'
-		cs.downloadFile('/', url.hostname + '_index.html')
+		return cs.downloadFile('/', url.hostname + '_index.html')
